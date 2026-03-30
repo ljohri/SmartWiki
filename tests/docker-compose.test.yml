@@ -1,0 +1,17 @@
+# Lightweight stack for integration tests (Postgres + Qdrant only).
+# Wiki.js / FastAPI services are expected on host or full docker-compose.
+
+services:
+  postgres-test:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: wikijs_test
+      POSTGRES_USER: wikijs
+      POSTGRES_PASSWORD: testpass
+    ports:
+      - "5433:5432"
+
+  qdrant-test:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6335:6333"

@@ -1,0 +1,30 @@
+# Data & secrets
+data/
+.env
+.env.local
+*.pem
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store

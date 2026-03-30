@@ -1,0 +1,190 @@
+<!--
+  SmartWiki — Document submission (paste into Wiki.js HTML page /submit).
+  Replace SMARTWIKI_CONFIG values. For production, prefer a reverse proxy that
+  injects Authorization and never exposes ORGANIZER_API_KEY in public HTML.
+-->
+<script>
+  window.SMARTWIKI_CONFIG = {
+    organizerUrl: "http://localhost:3001",
+    organizerApiKey: "REPLACE_WITH_ORGANIZER_API_KEY",
+  };
+</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<div class="min-h-screen bg-slate-50 text-slate-900">
+  <div class="max-w-5xl mx-auto px-4 py-8">
+    <nav class="text-sm text-slate-500 mb-6">
+      <a href="/" class="hover:text-slate-800">Home</a>
+      <span class="mx-2">→</span>
+      <span class="text-slate-800 font-medium">Submit Document</span>
+    </nav>
+    <header class="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Submit documents</h1>
+        <p class="text-slate-600 mt-1">Upload one or more files. Each file is classified and filed by the AI organizer.</p>
+      </div>
+      <div id="user-pill" class="text-sm text-slate-600 bg-white border border-slate-200 rounded-full px-4 py-2 self-start">
+        Signed in via Wiki.js
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <form id="submit-form" class="lg:col-span-2 space-y-6 bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Title (batch)</label>
+          <input name="title" required class="w-full rounded-lg border-slate-300 focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g. Q1 Security review" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Category</label>
+          <select name="category" required class="w-full rounded-lg border-slate-300">
+            <option>Engineering</option>
+            <option>Product</option>
+            <option>HR</option>
+            <option>Legal</option>
+            <option>General</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Tags (comma-separated)</label>
+          <input name="tags" class="w-full rounded-lg border-slate-300" placeholder="security, onboarding" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+          <textarea name="description" rows="3" class="w-full rounded-lg border-slate-300" placeholder="Context for reviewers and the AI"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Files</label>
+          <div id="dropzone" class="mt-1 flex justify-center px-6 pt-10 pb-10 border-2 border-dashed rounded-xl border-slate-300 bg-slate-50 hover:border-indigo-400 transition cursor-pointer">
+            <div class="text-center">
+              <p class="text-sm text-slate-600">Drag & drop or click to select</p>
+              <p class="text-xs text-slate-400 mt-1">.pdf, .md, .docx, .txt — multiple allowed</p>
+              <input id="file-input" type="file" name="files" multiple accept=".pdf,.md,.docx,.txt" class="hidden" />
+            </div>
+          </div>
+          <ul id="file-list" class="mt-3 text-sm text-slate-600 space-y-1"></ul>
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="submit" id="submit-btn" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+            Submit
+          </button>
+          <span id="form-status" class="text-sm text-slate-500"></span>
+        </div>
+      </form>
+      <aside class="space-y-4">
+        <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm text-indigo-900">
+          <p class="font-medium mb-1">How it works</p>
+          <ol class="list-decimal list-inside space-y-1 text-indigo-800/90">
+            <li>Files are sent to the organizer service.</li>
+            <li>Claude picks the best wiki path under <code>/docs/...</code>.</li>
+            <li>A wiki page is created or updated; you get links per file.</li>
+          </ol>
+        </div>
+        <div id="results" class="hidden bg-white border border-slate-200 rounded-xl p-4 text-sm"></div>
+      </aside>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    const cfg = window.SMARTWIKI_CONFIG || {};
+    const dz = document.getElementById("dropzone");
+    const input = document.getElementById("file-input");
+    const list = document.getElementById("file-list");
+    const form = document.getElementById("submit-form");
+    const statusEl = document.getElementById("form-status");
+    const btn = document.getElementById("submit-btn");
+    const results = document.getElementById("results");
+
+    let selectedFiles = [];
+
+    function renderFiles() {
+      list.innerHTML = "";
+      selectedFiles.forEach((f, i) => {
+        const li = document.createElement("li");
+        li.textContent = f.name + " (" + Math.round(f.size / 1024) + " KB)";
+        list.appendChild(li);
+      });
+    }
+
+    dz.addEventListener("click", () => input.click());
+    dz.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dz.classList.add("border-indigo-500");
+    });
+    dz.addEventListener("dragleave", () => dz.classList.remove("border-indigo-500"));
+    dz.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dz.classList.remove("border-indigo-500");
+      selectedFiles = Array.from(e.dataTransfer.files || []);
+      renderFiles();
+    });
+    input.addEventListener("change", () => {
+      selectedFiles = Array.from(input.files || []);
+      renderFiles();
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      results.classList.add("hidden");
+      results.innerHTML = "";
+      statusEl.textContent = "";
+      if (!selectedFiles.length) {
+        statusEl.textContent = "Please choose at least one file.";
+        return;
+      }
+      if (!cfg.organizerUrl || !cfg.organizerApiKey || cfg.organizerApiKey.startsWith("REPLACE")) {
+        statusEl.textContent = "Configure SMARTWIKI_CONFIG (organizerUrl + organizerApiKey).";
+        return;
+      }
+
+      const fd = new FormData(form);
+      fd.delete("files");
+      selectedFiles.forEach((f) => fd.append("files", f, f.name));
+
+      btn.disabled = true;
+      statusEl.textContent = "Uploading and classifying…";
+
+      try {
+        const res = await fetch(cfg.organizerUrl.replace(/\/$/, "") + "/api/submit", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + cfg.organizerApiKey,
+          },
+          body: fd,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.detail || data.message || res.statusText);
+        }
+        statusEl.textContent = "Done.";
+        results.classList.remove("hidden");
+        const ul = document.createElement("ul");
+        ul.className = "space-y-2";
+        (data.results || []).forEach((r) => {
+          const li = document.createElement("li");
+          if (r.success) {
+            li.innerHTML =
+              '<span class="text-emerald-700 font-medium">OK</span> — ' +
+              (r.filename || "") +
+              ' → <a class="text-indigo-600 underline" href="' +
+              (r.pageUrl || "#") +
+              '">' +
+              (r.pagePath || "") +
+              "</a>";
+          } else {
+            li.innerHTML =
+              '<span class="text-red-600 font-medium">Failed</span> — ' +
+              (r.filename || "") +
+              ": " +
+              (r.error || "error");
+          }
+          ul.appendChild(li);
+        });
+        results.appendChild(ul);
+      } catch (err) {
+        statusEl.textContent = "Error: " + (err && err.message ? err.message : String(err));
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  })();
+</script>

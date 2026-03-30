@@ -1,0 +1,102 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-wikijs}
+      POSTGRES_USER: ${POSTGRES_USER:-wikijs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wikijs} -d ${POSTGRES_DB:-wikijs}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  wiki:
+    image: ghcr.io/requarks/wiki:2
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_TYPE: postgres
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-wikijs}
+      DB_PASS: ${POSTGRES_PASSWORD:-changeme}
+      DB_NAME: ${POSTGRES_DB:-wikijs}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data/wiki:/wiki/data
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+
+  organizer:
+    build:
+      context: ./wiki-organizer
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      wiki:
+        condition: service_started
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      WIKIJS_GRAPHQL_URL: ${WIKIJS_GRAPHQL_URL:-http://wiki:3000/graphql}
+      WIKIJS_API_TOKEN: ${WIKIJS_API_TOKEN}
+      WIKIJS_LOCALE: ${WIKIJS_LOCALE:-en}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      ORGANIZER_API_KEY: ${ORGANIZER_API_KEY}
+      WIKI_PUBLIC_URL: ${WIKI_PUBLIC_URL:-http://localhost:3000}
+      ORGANIZER_PUBLIC_URL: ${ORGANIZER_PUBLIC_URL:-http://localhost:3001}
+      CORS_ORIGINS: ${WIKI_PUBLIC_URL:-http://localhost:3000}
+    ports:
+      - "3001:3001"
+
+  chatbot:
+    build:
+      context: ./chatbot-api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      wiki:
+        condition: service_started
+      qdrant:
+        condition: service_started
+    environment:
+      WIKIJS_GRAPHQL_URL: ${WIKIJS_GRAPHQL_URL:-http://wiki:3000/graphql}
+      WIKIJS_API_TOKEN: ${WIKIJS_API_TOKEN}
+      WIKIJS_LOCALE: ${WIKIJS_LOCALE:-en}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      VOYAGEAI_API_KEY: ${VOYAGEAI_API_KEY}
+      VOYAGE_EMBEDDING_MODEL: ${VOYAGE_EMBEDDING_MODEL:-voyage-4}
+      VOYAGE_EMBEDDING_DIMENSION: ${VOYAGE_EMBEDDING_DIMENSION:-1024}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-wiki_chunks}
+      CHATBOT_API_KEY: ${CHATBOT_API_KEY}
+      WIKI_PUBLIC_URL: ${WIKI_PUBLIC_URL:-http://localhost:3000}
+      CHATBOT_PUBLIC_URL: ${CHATBOT_PUBLIC_URL:-http://localhost:3002}
+      CORS_ORIGINS: ${WIKI_PUBLIC_URL:-http://localhost:3000}
+      INGEST_INTERVAL_SECONDS: ${INGEST_INTERVAL_SECONDS:-21600}
+      CHAT_RATE_LIMIT_PER_MINUTE: ${CHAT_RATE_LIMIT_PER_MINUTE:-20}
+    ports:
+      - "3002:3002"
