@@ -1,19 +1,20 @@
-# Data & secrets
+# SmartWiki — data & secrets
 data/
 .env
 .env.local
+.envrc
 *.pem
 
 # Python
 .venv/
+venv/
 __pycache__/
 *.py[cod]
 *$py.class
 .Python
-.venv/
-venv/
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .mypy_cache/
 .ruff_cache/
@@ -23,8 +24,21 @@ test-results/
 playwright-report/
 playwright/.cache/
 
-# IDE
+# Packaging / build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# IDE & OS
 .idea/
 .vscode/
 *.swp
 .DS_Store
+
+# Cursor
+.cursorignore
+.cursorindexingignore
+
+# Logs
+*.log
