@@ -1,5 +1,17 @@
 # SmartWiki deployment guide
 
+## CI (GitHub Actions)
+
+On every push and pull request to `main` / `master`, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
+
+1. Installs **[uv](https://docs.astral.sh/uv/)** and Python 3.12.
+2. Runs **`uv lock --check`** so `uv.lock` matches `pyproject.toml`.
+3. Runs **`uv sync --frozen --all-groups`** for a reproducible dev environment.
+4. Runs **`uv run pytest tests/unit`**.
+5. Builds **Docker** images for `wiki-organizer` and `chatbot-api` (no registry push unless you extend the workflow).
+
+Use **workflow_dispatch** in the Actions tab to run the pipeline manually.
+
 ## Local / single-server (Docker Compose)
 
 1. Copy `.env.example` → `.env`; set strong passwords and API keys.

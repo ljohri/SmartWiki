@@ -42,6 +42,7 @@ See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for detail.
 - [Anthropic API key](https://console.anthropic.com/) (Claude)
 - [Voyage AI API key](https://www.voyageai.com/) (embeddings; model default `voyage-4`, 1024 dims)
 - **Python 3.12** recommended for local tests (see `.python-version`)
+- **[uv](https://docs.astral.sh/uv/)** for the dev virtualenv (lockfile-driven; same as CI)
 
 ## Quick start
 
@@ -109,28 +110,38 @@ See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for detail.
 | `POST /api/chat` | chatbot | Bearer `CHATBOT_API_KEY` |
 | `POST /api/ingest` | chatbot | Bearer `CHATBOT_API_KEY` |
 
-## Tests
+## Tests (uv)
+
+The repo root [`pyproject.toml`](pyproject.toml) + [`uv.lock`](uv.lock) define a **single dev environment** (organizer + chatbot + test deps). Docker images still install from each service’s `requirements.txt`.
 
 ```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -r wiki-organizer/requirements.txt -r chatbot-api/requirements.txt -r tests/requirements-test.txt
-pytest tests/unit -v
+# Install uv: https://docs.astral.sh/uv/getting-started/installation/
+cd SmartWiki
+uv sync --all-groups          # creates .venv and installs locked deps
+uv run pytest tests/unit -v
 ```
+
+After changing dependencies in `pyproject.toml`, refresh the lockfile and commit it:
+
+```bash
+uv lock
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs `uv lock --check`, `uv sync --frozen --all-groups`, and `uv run pytest tests/unit` on every push/PR.
 
 - **Integration** (health checks against running stack):
 
   ```bash
   export INTEGRATION_TESTS=1
-  pytest tests/integration -v
+  uv run pytest tests/integration -v
   ```
 
 - **E2E** (Playwright; full stack):
 
   ```bash
   export RUN_E2E=1
-  pip install playwright && playwright install chromium
-  pytest tests/e2e -v
+  uv run playwright install chromium
+  uv run pytest tests/e2e -v
   ```
 
 See `.env.test.example` and `tests/docker-compose.test.yml`.
