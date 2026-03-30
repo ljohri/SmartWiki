@@ -127,7 +127,28 @@ After changing dependencies in `pyproject.toml`, refresh the lockfile and commit
 uv lock
 ```
 
-GitHub Actions (`.github/workflows/ci.yml`) runs `uv lock --check`, `uv sync --frozen --all-groups`, and `uv run pytest tests/unit` on every push/PR.
+### CI/CD (GitHub Actions)
+
+Workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (**CI/CD**):
+
+| Trigger | What runs |
+|---------|-----------|
+| **Pull request** | `uv` lock check, unit tests, **Docker build** (no registry push) |
+| **Push** to `main` / `master` | Same tests + **build & push** images to **GitHub Container Registry** (GHCR) |
+| **Tag** `v*` (e.g. `v1.0.0`) | Tests + push images tagged with the version and **`latest`** |
+| **workflow_dispatch** | Run manually; **publishes** images for the selected branch (useful for rebuilds) |
+
+Images (replace `OWNER` with your GitHub user or org, lowercase):
+
+- `ghcr.io/OWNER/smartwiki-organizer:main` (and `sha-…` per commit)
+- `ghcr.io/OWNER/smartwiki-chatbot:main` (and `sha-…`)
+
+After the first push, open **Packages** on GitHub, set visibility (public/private), and optionally **link** the package to this repo. Pull:
+
+```bash
+docker pull ghcr.io/OWNER/smartwiki-organizer:main
+docker pull ghcr.io/OWNER/smartwiki-chatbot:main
+```
 
 - **Integration** (health checks against running stack):
 

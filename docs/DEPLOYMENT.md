@@ -1,16 +1,29 @@
 # SmartWiki deployment guide
 
-## CI (GitHub Actions)
+## CI/CD (GitHub Actions)
 
-On every push and pull request to `main` / `master`, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) implements the full pipeline:
 
-1. Installs **[uv](https://docs.astral.sh/uv/)** and Python 3.12.
-2. Runs **`uv lock --check`** so `uv.lock` matches `pyproject.toml`.
-3. Runs **`uv sync --frozen --all-groups`** for a reproducible dev environment.
-4. Runs **`uv run pytest tests/unit`**.
-5. Builds **Docker** images for `wiki-organizer` and `chatbot-api` (no registry push unless you extend the workflow).
+**Continuous integration**
 
-Use **workflow_dispatch** in the Actions tab to run the pipeline manually.
+1. **[uv](https://docs.astral.sh/uv/)** + Python 3.12.
+2. **`uv lock --check`** — lockfile matches `pyproject.toml`.
+3. **`uv sync --frozen --all-groups`** — reproducible env.
+4. **`uv run pytest tests/unit`**.
+
+**Continuous delivery (container images)**
+
+- **Pull requests**: Docker images are **built only** (validates Dockerfiles); nothing is pushed (avoids leaking registry tokens on fork PRs).
+- **Push** to `main` / `master`: images are pushed to **GitHub Container Registry** (`ghcr.io`):
+  - `ghcr.io/<owner>/smartwiki-organizer` — tags `main`, `sha-<short>`, …
+  - `ghcr.io/<owner>/smartwiki-chatbot` — same pattern.
+- **Git tag** `v*` (e.g. `v1.2.0`): same images also get **version** and **`latest`** tags.
+- **workflow_dispatch**: re-run from the Actions tab to rebuild and **push** for the chosen branch.
+
+**Post-setup**
+
+- In GitHub → **Packages**, set each package’s **visibility** and connect it to the repository if desired.
+- Deploy by pointing your runtime (Compose override, Kubernetes, Cloud Run, etc.) at the GHCR digests or tags you trust.
 
 ## Local / single-server (Docker Compose)
 
